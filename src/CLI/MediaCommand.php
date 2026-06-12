@@ -1,51 +1,77 @@
 <?php declare(strict_types=1);
+
 namespace Gratis\Media\CLI;
 
 use Gratis\Media\Folders;
 
-final class MediaCommand
-{
+defined('ABSPATH') || exit;
+
+/**
+ * WP-CLI helpers for Gratis Media.
+ */
+final class MediaCommand {
+
     /**
-     * Organize media into folders.
+     * Organize media into type-based folders.
+     *
      * @when after_wp_load
+     *
+     * @param array<int,string>    $args       Positional args (unused).
+     * @param array<string,string> $assoc_args Associative args (unused).
      */
-    public function organize($args, $assoc_args): void
-    {
-        $attachments = get_posts(['post_type' => 'attachment', 'numberposts' => -1, 'post_status' => 'inherit']);
-        $organized = 0;
-        foreach ($attachments as $att) {
-            $mime = $att->post_mime_type;
-            $folder = match (true) {
-                str_starts_with($mime, 'image/') => 'Images',
-                str_starts_with($mime, 'video/') => 'Videos',
-                str_starts_with($mime, 'audio/') => 'Audio',
-                str_contains($mime, 'pdf')       => 'Documents',
-                default                          => 'Other',
-            };
-            $term = get_term_by('name', $folder, 'media_folder');
-            if (!$term) {
-                $result = wp_insert_term($folder, 'media_folder');
-                $term_id = is_wp_error($result) ? 0 : $result['term_id'];
-            } else {
-                $term_id = $term->term_id;
-            }
-            if ($term_id) { Folders::assign($att->ID, $term_id); $organized++; }
-        }
+    public function organize($args, $assoc_args): void {
+        unset($args, $assoc_args);
+        $organized = Folders::organizeAll();
         \WP_CLI::success("{$organized} files organized into folders.");
     }
 
     /**
-     * Clean up unused media.
-     * [--dry-run] : Show what would be deleted.
+     * Report potentially unused (unattached) media.
+     *
+     * ## OPTIONS
+     *
+     * [--dry-run]
+     * : Show what would be reported without further output.
+     *
      * @when after_wp_load
+     *
+     * @param array<int,string>    $args       Positional args (unused).
+     * @param array<string,string> $assoc_args Associative args.
      */
-    public function cleanup($args, $assoc_args): void
-    {
+    public function cleanup($args, $assoc_args): void {
+        unset($args);
         global $wpdb;
-        $unused = $wpdb->get_col("SELECT ID FROM {$wpdb->posts} WHERE post_type = 'attachment' AND post_parent = 0 AND ID NOT IN (SELECT meta_value FROM {$wpdb->postmeta} WHERE meta_key = '_thumbnail_id')");
-        \WP_CLI::log(count($unused) . " potentially unused media files.");
-        if (isset($assoc_args['dry-run'])) return;
-        // Don't auto-delete — just report
-        \WP_CLI::log("Review in Media Library with 'Unattached' filter.");
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- one-off CLI maintenance report.
+        $unused = $wpdb->get_col(
+            "SELECT ID FROM {$wpdb->posts} WHERE post_type = 'attachment' AND post_parent = 0 AND ID NOT IN (SELECT meta_value FROM {$wpdb->postmeta} WHERE meta_key = '_thumbnail_id')"
+        );
+        \WP_CLI::log(count($unused) . ' potentially unused media files.');
+        if (isset($assoc_args['dry-run'])) {
+            return;
+        }
+        \WP_CLI::log("Review in Media Library with the 'Unattached' filter.");
+    }
+
+    /**
+     * List media folders.
+     *
+     * @when after_wp_load
+     *
+     * @param array<int,string>    $args       Positional args (unused).
+     * @param array<string,string> $assoc_args Associative args (unused).
+     */
+    public function folders($args, $assoc_args): void {
+        unset($args, $assoc_args);
+        $terms = Folders::getAll();
+        if (empty($terms)) {
+            \WP_CLI::log('No folders.');
+            return;
+        }
+        $rows = array_map(static fn($t) => [
+            'ID'    => $t->term_id,
+            'Name'  => $t->name,
+            'Items' => $t->count,
+        ], $terms);
+        \WP_CLI\Utils\format_items('table', $rows, ['ID', 'Name', 'Items']);
     }
 }
