@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Gratis Media
  * Plugin URI: https://github.com/juslintek/gratis-media
- * Description: Advanced media library with folders + gallery shortcode. Replaces FileBird ($39/yr) + Envira Gallery ($49/yr).
+ * Description: Advanced media library with folders + gallery shortcode.
  * Version: 1.0.0
  * Requires at least: 6.4
  * Requires PHP: 8.1
