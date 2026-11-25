@@ -9,7 +9,7 @@ defined('ABSPATH') || exit;
  */
 final class Folders {
 
-    public const TAXONOMY = 'media_folder';
+    public const TAXONOMY = 'gratis_media_folder';
 
     /** Register the folder taxonomy and the media-library folder filter. */
     public static function register(): void {
@@ -35,10 +35,10 @@ final class Folders {
             return;
         }
         // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only list-table filter value.
-        $selected = isset($_GET['media_folder']) ? absint(wp_unslash($_GET['media_folder'])) : 0;
+        $selected = isset($_GET[self::TAXONOMY]) ? absint(wp_unslash($_GET[self::TAXONOMY])) : 0;
         wp_dropdown_categories([
             'taxonomy'        => self::TAXONOMY,
-            'name'            => 'media_folder',
+            'name'            => self::TAXONOMY,
             'show_option_all' => __('All Folders', 'gratis-media'),
             'hierarchical'    => true,
             'hide_empty'      => false,
